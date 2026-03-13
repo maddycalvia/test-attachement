@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Style d'attachement</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{background:#F2EBE0;font-family:Georgia,serif;min-height:100vh;}
+    button{font-family:Georgia,serif;cursor:pointer;}
+    input{font-family:Georgia,serif;}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:none;}}
+    .fade-up{animation:fadeUp 0.35s ease both;}
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+  const { useState, useEffect, useRef } = React;
+
+  const ACCENT="#C97A50", DARK="#2a1f1a", MID="#6b5246", BG="#F2EBE0", BG2="#F9F4EE", LIGHT="#aaaaaa";
+  const EMAILJS_SERVICE_ID  = "service_0kouxat";
+  const EMAILJS_TEMPLATE_ID = "template_kt263tv";
+  const EMAILJS_PUBLIC_KEY  = "uhjbdrXFqWGx4Rltl";
+
+  const THEMES = [
+    {
+      title:"La proximité & l'intimité",
+      subtitle:"Comment tu vis le fait d'être émotionnellement proche de quelqu'un.",
+      icon:"🌿",
+      questions:[
+        {id:"q1",  style:"S",    text:"Je me sens à l'aise pour me confier à ceux que j'aime, sans craindre de les perdre."},
+        {id:"q2",  style:"A-ab", text:"J'ai souvent peur que les gens que j'aime finissent par me quitter ou se désintéresser de moi."},
+        {id:"q3",  style:"Ev-i", text:"Quand une relation devient trop intense ou trop proche, je ressens le besoin de prendre de la distance."},
+        {id:"q4",  style:"D",    text:"Je veux profondément être proche des autres, mais quand ça arrive, quelque chose en moi résiste ou s'affole."},
+        {id:"q5",  style:"S",    text:"Je peux laisser quelqu'un entrer dans ma vie sans avoir peur de me perdre moi-même."},
+        {id:"q6",  style:"Ev-e", text:"Je minimise mes besoins affectifs — j'ai appris que c'est plus simple que de les exprimer."},
+        {id:"q7",  style:"A-rj", text:"Je surveille les signaux dans mes relations pour détecter si l'autre est en train de se distancer."},
+        {id:"q8",  style:"D",    text:"Mes réactions dans les moments d'intimité me surprennent parfois moi-même — elles me semblent disproportionnées."},
+      ]
+    },
+    {
+      title:"La confiance & la peur de l'abandon",
+      subtitle:"Comment tu vis la sécurité dans les liens, et ce qui se passe quand elle vacille.",
+      icon:"🌊",
+      questions:[
+        {id:"q9",  style:"S",    text:"Quand quelqu'un s'éloigne temporairement, je reste serein(e) — je sais que la relation tient."},
+        {id:"q10", style:"A-ab", text:"Quand quelqu'un que j'aime ne répond pas ou semble distant(e), j'imagine souvent le pire et l'inquiétude prend toute la place."},
+        {id:"q11", style:"Ev-i", text:"Je préfère compter sur moi-même plutôt que sur les autres — ça m'évite d'être déçu(e)."},
+        {id:"q12", style:"A-ab", text:"J'ai besoin de beaucoup de réassurance dans mes relations pour me sentir vraiment aimé(e) et en sécurité."},
+        {id:"q13", style:"S",    text:"Je fais confiance aux gens que j'aime, même quand je ne les vois pas ou qu'ils sont moins disponibles."},
+        {id:"q14", style:"D",    text:"J'ai du mal à faire confiance, même aux personnes qui me semblent sincèrement bienveillantes."},
+        {id:"q15", style:"A-rj", text:"La peur d'être rejeté(e) ou jugé(e) influence souvent ce que je dis ou ce que je montre de moi."},
+        {id:"q16", style:"Ev-e", text:"Je me sens plus à l'aise dans des relations qui restent légères — sans trop de profondeur émotionnelle."},
+      ]
+    },
+    {
+      title:"Les conflits & la régulation émotionnelle",
+      subtitle:"Comment tu réagis quand ça se tend, et ce qui se passe en toi dans les moments difficiles.",
+      icon:"🌪️",
+      questions:[
+        {id:"q17", style:"S",    text:"Dans les conflits, je peux exprimer mon point de vue sans perdre le fil de ce que je ressens."},
+        {id:"q18", style:"A-ab", text:"Quand une relation ne va pas bien, j'ai du mal à penser à autre chose — ça occupe tout l'espace intérieur."},
+        {id:"q19", style:"Ev-i", text:"Je mets de la distance quand une relation devient trop émotionnellement chargée — c'est ma façon de me protéger."},
+        {id:"q20", style:"D",    text:"Dans les conflits, je me sens dépassé(e) — je ne sais pas si fuir ou rester, et mes réactions varient beaucoup."},
+        {id:"q21", style:"S",    text:"Je peux traverser un désaccord sans avoir peur que la relation soit définitivement abîmée."},
+        {id:"q22", style:"A-rj", text:"Je m'excuse facilement, parfois même quand je ne pense pas avoir tort — pour désamorcer la tension."},
+        {id:"q23", style:"Ev-e", text:"J'ai tendance à couper le lien plutôt qu'à tenter de réparer une relation qui ne va pas bien."},
+        {id:"q24", style:"D",    text:"Mes relations oscillent souvent entre une grande intensité et une rupture ou une coupure totale."},
+      ]
+    },
+    {
+      title:"L'attachement à soi",
+      subtitle:"Comment tu te traites toi-même — ta voix intérieure, ton estime propre, ta compassion envers toi.",
+      icon:"🪞",
+      questions:[
+        {id:"q25", style:"S",    text:"J'ai confiance en ma valeur personnelle, indépendamment de ce que les autres pensent ou ressentent à mon égard."},
+        {id:"q26", style:"A-rj", text:"Mon opinion de moi-même varie beaucoup selon comment les autres me traitent ou me perçoivent."},
+        {id:"q27", style:"Ev-e", text:"Je suis plus dur(e) avec moi-même qu'avec n'importe qui d'autre — et je trouve ça normal, voire nécessaire."},
+        {id:"q28", style:"D",    text:"J'ai parfois le sentiment d'être fondamentalement différent(e) des autres, ou de ne pas mériter d'être aimé(e) vraiment."},
+        {id:"q29", style:"S",    text:"Je peux m'accorder de la compassion dans les moments difficiles, comme je le ferais pour un ami proche."},
+        {id:"q30", style:"A-ab", text:"Je donne beaucoup dans mes relations, parfois bien au-delà de mes propres limites, pour maintenir le lien."},
+        {id:"q31", style:"Ev-i", text:"J'ai du mal à identifier ce que je ressens vraiment — mes émotions me semblent souvent floues ou lointaines."},
+        {id:"q32", style:"D",    text:"Je me retrouve parfois dans des comportements que je ne comprends pas moi-même et qui me font me sentir étranger(e) à moi-même."},
+      ]
+    },
+    {
+      title:"L'attachement au travail & à l'argent",
+      subtitle:"Comment tes patterns d'attachement se manifestent dans ta vie professionnelle et financière.",
+      icon:"⚙️",
+      questions:[
+        {id:"q33", style:"S",    text:"Je peux m'engager pleinement dans mon travail tout en gardant de la distance par rapport aux résultats — sans que mon identité en dépende."},
+        {id:"q34", style:"A-ab", text:"L'instabilité financière ou professionnelle déclenche chez moi une anxiété intense, parfois disproportionnée par rapport à la situation réelle."},
+        {id:"q35", style:"Ev-e", text:"Je m'investis dans le travail plutôt que dans les relations — c'est un espace où je me sens plus en contrôle et moins vulnérable."},
+        {id:"q36", style:"D",    text:"Je sabote parfois des opportunités professionnelles ou financières au moment où elles deviennent concrètes — sans vraiment comprendre pourquoi."},
+        {id:"q37", style:"S",    text:"Je peux demander de l'aide ou déléguer sans ressentir de honte ou de sentiment d'incompétence."},
+        {id:"q38", style:"A-rj", text:"J'ai besoin d'être reconnu(e) et valorisé(e) dans mon travail pour me sentir légitime — l'approbation extérieure compte beaucoup."},
+        {id:"q39", style:"Ev-i", text:"L'argent me crée de l'inconfort — je préfère éviter d'y penser ou d'en parler, même quand c'est nécessaire."},
+        {id:"q40", style:"D",    text:"Mon rapport à l'argent est ambivalent : je veux la sécurité financière, mais quelque chose en moi résiste à la construire vraiment."},
+      ]
+    },
+  ];
+
+  const LIKERT=[
+    {val:1,label:"Pas moi"},
+    {val:2,label:"Rarement"},
+    {val:3,label:"Parfois"},
+    {val:4,label:"Souvent"},
+    {val:5,label:"Tout à fait moi"},
+  ];
+
+  const STYLES = {
+    S:  { label:"Sécure",       color:"#4CAF50", icon:"🌿",
+          desc:"Tu as développé une base intérieure solide. Tu peux aller vers les autres sans te perdre, et rester toi-même quand quelqu'un s'éloigne. Ce n'est pas une absence d'émotions — c'est une capacité à les traverser sans te noyer. Tu fais confiance, pas aveuglément, mais suffisamment pour te laisser toucher.",
+          forces:["Confort avec l'intimité sans fusion","Confiance en ta valeur propre indépendante","Capacité à demander et à donner sans calcul","Résilience face aux ruptures temporaires","Régulation émotionnelle souple et adaptable"],
+          defis:["Peut être difficile de comprendre les angoisses des profils insécures","Risque de découragement face à des partenaires très insécures","La sécurité peut se fragiliser dans des périodes de grand stress"],
+          conseils:[
+            "💬 Ton style sécure est une ressource précieuse — pas seulement pour toi, mais pour ceux qui t'entourent. Les personnes anxieuses ou évitantes bénéficient d'une présence stable comme la tienne.",
+            "💬 La sécurité n'est pas figée — elle se cultive et peut se fragiliser dans certaines périodes (deuil, rupture, stress prolongé). Rester attentif(ve) à tes propres besoins reste essentiel.",
+            "💬 Veille à ne pas confondre sécurité intérieure et imperméabilité. Rester ouvert(e) aux besoins de l'autre, même quand ils semblent 'excessifs', fait partie de la vraie sécurité relationnelle.",
+            "💬 Dans les relations avec des profils très insécures, le défi est de rester stable sans devenir le 'soignant' permanent. Ton équilibre est aussi une limite à respecter.",
+          ]
+        },
+    A:  { label:"Anxieux",      color:"#F57C00", icon:"🌊",
+          desc:"Tu aimes profondément — et c'est justement ça qui fait parfois si mal. Le style anxieux naît souvent d'un apprentissage précoce où l'amour était bien là, mais imprévisible. Alors tu as appris à surveiller les signes, à t'adapter, à donner plus pour garder la connexion. Cette sensibilité est aussi une profondeur rare.",
+          forces:["Capacité d'amour intense et généreux","Grande empathie et attention aux besoins de l'autre","Engagement profond et durable dans les relations","Sensibilité émotionnelle fine et intuition relationnelle"],
+          defis:["Hypervigilance aux signaux de rejet ou d'abandon","Tendance à se sacrifier pour maintenir le lien","Difficulté à rester serein(e) dans l'incertitude","Dépendance forte à la validation extérieure"],
+          conseils:[
+            "💬 L'anxiété relationnelle est souvent une vieille réponse à une vraie douleur ancienne. Elle n'est pas un défaut de caractère — c'est une adaptation qui a servi, et qui peut évoluer.",
+            "💬 Travailler sur la régulation émotionnelle (EMDR, thérapies d'attachement, pleine conscience) peut transformer la relation à soi avant même de transformer les relations aux autres.",
+            "💬 Dans tes relations, observe : est-ce que je donne parce que j'en ai envie, ou parce que j'ai peur de perdre ? Cette distinction peut tout changer sur le long terme.",
+            "💬 Les partenaires sécures sont souvent les plus apaisants pour les profils anxieux — cherche des liens qui te stabilisent plutôt que ceux qui réactivent l'intensité.",
+            "💬 La solitude choisie, différente de la solitude subie, peut devenir une ressource. Apprendre à être bien avec soi-même réduit progressivement la dépendance à la réassurance.",
+          ]
+        },
+    Ev: { label:"Évitant",      color:"#1976D2", icon:"🪨",
+          desc:"Tu as appris à être ton propre soutien. L'indépendance n'est pas un défaut — c'est souvent une force construite dans des environnements où montrer ses besoins n'était pas sûr ou ne servait à rien. Le défi maintenant est de distinguer la vraie autonomie de l'isolement défensif.",
+          forces:["Autonomie et solidité personnelle bien développées","Peu de dépendance émotionnelle","Capacité à fonctionner efficacement seul(e) sous pression","Clarté sur ses propres limites et son espace personnel"],
+          defis:["Difficulté à exprimer les besoins affectifs","Inconfort avec l'intimité profonde ou la vulnérabilité","Tendance à couper le lien plutôt qu'à le réparer","Peut être perçu(e) comme froid(e) ou émotionnellement indisponible"],
+          conseils:[
+            "💬 L'évitement n'est pas un manque d'amour — c'est souvent une vieille protection contre une vulnérabilité qui a déjà coûté. Le nommer change déjà quelque chose.",
+            "💬 Travailler à tolérer graduellement l'inconfort de l'intimité — pas en te forçant, mais en t'exposant progressivement à des liens qui respectent aussi tes limites.",
+            "💬 Observe les moments où tu mets de la distance. Est-ce un vrai besoin de solitude, ou une fuite d'une émotion inconfortable ? Les deux méritent attention différente.",
+            "💬 Les thérapies corporelles (somatic experiencing, yoga thérapeutique) peuvent être particulièrement utiles pour les profils évitants — l'entrée par le corps contourne parfois la résistance mentale.",
+            "💬 Dans le travail et l'argent, l'hyper-investissement professionnel peut être une forme d'évitement affectif. Nommer ça permet d'y répondre autrement.",
+          ]
+        },
+    D:  { label:"Désorganisé",  color:"#7B1FA2", icon:"🌪️",
+          desc:"Tu portes une contradiction difficile : tu veux de la connexion ET tu en as peur. Ce style émerge souvent là où la figure d'attachement principale était à la fois source de sécurité et de danger — un paradoxe impossible à résoudre pour un enfant. Ce n'est pas un manque de volonté, ni un défaut. C'est une cicatrice qui mérite attention et douceur.",
+          forces:["Profonde capacité de compassion — souvent envers les autres","Sensibilité fine au danger et aux dynamiques relationnelles","Résilience acquise à force de traverser des paradoxes","Potentiel de transformation profonde une fois accompagné(e)"],
+          defis:["Ambivalence intense dans les liens proches (attirer / repousser)","Réactions parfois imprévisibles ou disproportionnées","Difficultés à réguler les émotions intenses","Méfiance même envers les relations sincèrement bienveillantes"],
+          conseils:[
+            "💬 Le style désorganisé est souvent lié à des traumatismes relationnels précoces. Un accompagnement spécialisé (EMDR, thérapie trauma-focused, IFS) peut faire une vraie différence.",
+            "💬 La sécurité ne viendra pas en un seul lien ou une seule prise de conscience — elle se construit par couches, lentement, dans des relations qui prouvent leur fiabilité dans la durée.",
+            "💬 Quand tu ressens une ambivalence forte (attirer/repousser), essaie de nommer ça à voix haute avec quelqu'un de confiance. Nommer réduit l'intensité de la tempête intérieure.",
+            "💬 Tu n'as pas à résoudre ça seul(e). Ce style est celui qui bénéficie le plus d'un accompagnement — pas parce que tu es 'cassé(e)', mais parce que le paradoxe que tu portes est lourd à tenir seul(e).",
+            "💬 Dans les périodes de stabilité relative, construis des routines de sécurité avec toi-même (ancrage corporel, journaling, rituels simples). Ces bases internes aident à traverser les turbulences.",
+          ]
+        },
+  };
+
+  const SUB_SCORES = {
+    "A-ab":{ label:"Anxiété d'abandon",      color:"#FF8F00", icon:"🔗",
+      desc:"La peur que ceux que tu aimes te quittent, se désintéressent ou s'éloignent. Cette dimension est souvent liée à des expériences précoces de perte, d'imprévisibilité affective ou d'abandon réel ou ressenti.",
+      note:"Un score élevé signale souvent une hypersensibilité aux signaux de départ ou de désengagement chez l'autre — et une tendance à surinvestir pour retenir le lien."
+    },
+    "A-rj":{ label:"Anxiété de rejet",        color:"#F4511E", icon:"👁️",
+      desc:"La peur d'être jugé(e), écarté(e) ou de ne pas être suffisant(e) aux yeux des autres. Elle conduit souvent à l'auto-censure, à la recherche de validation et à la difficulté à s'affirmer pleinement.",
+      note:"Un score élevé peut se manifester par une surveillance constante des réactions de l'autre, et une tendance à moduler ce qu'on montre de soi pour éviter le rejet."
+    },
+    "Ev-e":{ label:"Évitement émotionnel",    color:"#1565C0", icon:"🧊",
+      desc:"La tendance à minimiser, ignorer ou couper l'accès à ses propres besoins et émotions affectifs. Souvent apprise dans un contexte où exprimer ses besoins n'était pas utile ou sûr.",
+      note:"Un score élevé peut se manifester par une difficulté à identifier ses émotions (alexithymie partielle) et un surinvestissement dans la logique, l'action ou le travail."
+    },
+    "Ev-i":{ label:"Évitement de l'intimité", color:"#0D47A1", icon:"🚪",
+      desc:"L'inconfort face à la proximité émotionnelle et la tendance à se protéger en maintenant une distance relationnelle — même avec des personnes appréciées.",
+      note:"Un score élevé peut coexister avec une vraie vie sociale active. La distance est souvent subtile mais bien présente dès que les liens deviennent vraiment profonds."
+    },
+  };
+
+  function computeScores(answers){
+    const raw={"S":0,"A-ab":0,"A-rj":0,"Ev-e":0,"Ev-i":0,"D":0};
+    THEMES.forEach(t=>t.questions.forEach(q=>{raw[q.style]+=(answers[q.id]||0);}));
+    const agg={S:raw["S"],A:raw["A-ab"]+raw["A-rj"],Ev:raw["Ev-e"]+raw["Ev-i"],D:raw["D"]};
+    const maxPossible={S:40,A:80,Ev:80,D:40};
+    const norm={};Object.keys(agg).forEach(k=>{norm[k]=agg[k]/maxPossible[k];});
+    const total=Object.values(norm).reduce((a,b)=>a+b,0);
+    const pct={};Object.keys(norm).forEach(k=>{pct[k]=total>0?Math.round((norm[k]/total)*100):25;});
+    const primary=Object.entries(norm).sort((a,b)=>b[1]-a[1])[0][0];
+    const subPct={
+      "A-ab":Math.round((raw["A-ab"]/40)*100),
+      "A-rj":Math.round((raw["A-rj"]/40)*100),
+      "Ev-e":Math.round((raw["Ev-e"]/40)*100),
+      "Ev-i":Math.round((raw["Ev-i"]/40)*100),
+    };
+    return{raw,agg,pct,norm,primary,subPct};
+  }
+
+  function ProgressBar({step,total}){
+    const pct=((step-1)/(total-1))*100;
+    return(
+      <div style={{marginBottom:20}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+          <div style={{fontSize:12,color:MID,fontStyle:"italic"}}>{THEMES[step-1]?.icon} {THEMES[step-1]?.title}</div>
+          <div style={{fontSize:11,color:LIGHT}}>Thème {step}/{total}</div>
+        </div>
+        <div style={{background:"#e8ddd4",borderRadius:8,height:5,overflow:"hidden"}}>
+          <div style={{width:`${pct}%`,height:"100%",background:ACCENT,borderRadius:8,transition:"width 0.4s ease"}}/>
+        </div>
+      </div>
+    );
+  }
+
+  function LikertQuestion({question,value,onChange,index}){
+    return(
+      <div className="fade-up" style={{marginBottom:24,animationDelay:`${index*0.07}s`}}>
+        <div style={{fontSize:13,color:DARK,lineHeight:1.75,marginBottom:12,fontStyle:"italic",paddingLeft:12,borderLeft:`3px solid ${ACCENT}`}}>
+          « {question.text} »
+        </div>
+        <div style={{display:"flex",gap:5}}>
+          {LIKERT.map(l=>{
+            const active=value===l.val;
+            return(
+              <div key={l.val} onClick={()=>onChange(l.val)} style={{
+                flex:"1 1 0",padding:"9px 4px",borderRadius:9,textAlign:"center",cursor:"pointer",
+                border:`2px solid ${active?ACCENT:"#e0d4c8"}`,background:active?ACCENT:"#fff",
+                color:active?"#fff":MID,transition:"all 0.15s ease",fontSize:11,lineHeight:1.3,
+              }}>
+                <div style={{fontSize:15,marginBottom:2}}>{l.val}</div>
+                <div style={{fontSize:8,opacity:0.85}}>{l.label}</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  function ScoreBar({label,pct,color,icon,isPrimary}){
+    return(
+      <div style={{marginBottom:12}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
+          <div style={{display:"flex",alignItems:"center",gap:7}}>
+            <span style={{fontSize:14}}>{icon}</span>
+            <span style={{fontSize:13,fontWeight:isPrimary?"bold":"normal",color:DARK}}>{label}</span>
+            {isPrimary&&<span style={{fontSize:9,padding:"2px 8px",borderRadius:10,background:color,color:"#fff",fontWeight:"bold"}}>Principal</span>}
+          </div>
+          <span style={{fontSize:13,fontWeight:"bold",color}}>{pct}%</span>
+        </div>
+        <div style={{background:"#e8ddd4",borderRadius:8,height:9,overflow:"hidden"}}>
+          <div style={{width:`${pct}%`,height:"100%",background:color,borderRadius:8,transition:"width 1.3s cubic-bezier(0.23,1,0.32,1)"}}/>
+        </div>
+      </div>
+    );
+  }
+
+  function SubScoreCard({subKey,pct}){
+    const s=SUB_SCORES[subKey];
+    const intensity=pct>=70?"Élevé":pct>=45?"Modéré":"Faible";
+    const ic=pct>=70?"#E53935":pct>=45?"#F57C00":"#4CAF50";
+    return(
+      <div style={{background:"#fff",borderRadius:10,padding:14,border:`1px solid ${s.color}25`,borderLeft:`3px solid ${s.color}`,marginBottom:10}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
+          <div style={{display:"flex",alignItems:"center",gap:7}}>
+            <span style={{fontSize:14}}>{s.icon}</span>
+            <span style={{fontSize:12,fontWeight:"bold",color:DARK}}>{s.label}</span>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <span style={{fontSize:11,fontWeight:"bold",color:s.color}}>{pct}%</span>
+            <span style={{fontSize:9,padding:"2px 8px",borderRadius:10,background:ic+"20",color:ic,fontWeight:"bold"}}>{intensity}</span>
+          </div>
+        </div>
+        <div style={{background:"#e8ddd4",borderRadius:6,height:6,overflow:"hidden",marginBottom:8}}>
+          <div style={{width:`${pct}%`,height:"100%",background:s.color,borderRadius:6,transition:"width 1.3s cubic-bezier(0.23,1,0.32,1)"}}/>
+        </div>
+        <p style={{fontSize:11,color:MID,lineHeight:1.65,fontStyle:"italic",marginBottom:6}}>{s.desc}</p>
+        <div style={{fontSize:10,color:LIGHT,lineHeight:1.5}}>→ {s.note}</div>
+      </div>
+    );
+  }
+
+  function Results({scores,prenom,email}){
+    const [sendStatus,setSendStatus]=useState("idle");
+    const [emailError,setEmailError]=useState(null);
+    const primary=STYLES[scores.primary];
+    const secondary=Object.entries(scores.pct).filter(([k])=>k!==scores.primary).sort((a,b)=>b[1]-a[1])[0];
+    const hasSecondary=secondary&&secondary[1]>=22;
+    const showASubs=scores.primary==="A"||(hasSecondary&&secondary[0]==="A")||scores.pct["A"]>=20;
+    const showEvSubs=scores.primary==="Ev"||(hasSecondary&&secondary[0]==="Ev")||scores.pct["Ev"]>=20;
+
+    const sendEmail=()=>{
+      if(!email){setSendStatus("no-email");return;}
+      setEmailError(null);setSendStatus("sending");
+      if(!window.emailjs){setEmailError("EmailJS non chargé.");setSendStatus("error");return;}
+      try{
+        window.emailjs.init({publicKey:EMAILJS_PUBLIC_KEY});
+        const styleRows=Object.entries(scores.pct).sort((a,b)=>b[1]-a[1]).map(([k,p])=>{
+          const s=STYLES[k];
+          return`<div style="margin-bottom:10px;"><div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>${s.icon} <b>${s.label}</b>${k===scores.primary?' <span style="font-size:10px;background:'+s.color+';color:#fff;padding:1px 7px;border-radius:8px;">Principal</span>':''}</span><span style="font-weight:bold;color:${s.color};">${p}%</span></div><div style="background:#e8ddd4;border-radius:6px;height:7px;overflow:hidden;"><div style="width:${p}%;height:100%;background:${s.color};border-radius:6px;"></div></div></div>`;
+        }).join("");
+        const subRows=[...(showASubs?[["A-ab",scores.subPct["A-ab"]],["A-rj",scores.subPct["A-rj"]]]:[]),...(showEvSubs?[["Ev-e",scores.subPct["Ev-e"]],["Ev-i",scores.subPct["Ev-i"]]]:[])].map(([k,p])=>{
+          const s=SUB_SCORES[k];
+          return`<div style="margin-bottom:8px;padding:10px 12px;border-radius:8px;border-left:3px solid ${s.color};background:#fafafa;"><div style="font-size:12px;font-weight:bold;color:${s.color};margin-bottom:4px;">${s.icon} ${s.label} — ${p}%</div><p style="font-size:11px;color:#6b5246;font-style:italic;line-height:1.6;margin:0;">${s.desc}</p></div>`;
+        }).join("");
+        const adviceRows=primary.conseils.map(c=>`<div style="margin-bottom:8px;padding:10px 14px;border-radius:8px;background:#FFF8F2;border:1px dashed rgba(201,122,80,0.4);font-size:12px;color:#6b5246;font-style:italic;line-height:1.7;">${c}</div>`).join("");
+        const html=`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"/></head><body style="font-family:Georgia,serif;background:#F2EBE0;padding:32px 24px;color:#2a1f1a;max-width:640px;margin:0 auto;">
+<h2 style="font-size:22px;margin:0 0 4px;">Style d'attachement${prenom?" — "+prenom:""}</h2>
+<p style="font-size:13px;color:#6b5246;font-style:italic;margin:0 0 28px;">Résultats de l'évaluation — 40 questions, 5 thèmes</p>
+<div style="background:#fff;border-radius:12px;padding:20px;margin-bottom:16px;border:2px solid ${primary.color}30;">
+  <div style="font-size:20px;font-weight:bold;color:${primary.color};margin-bottom:8px;">${primary.icon} Style principal : ${primary.label}</div>
+  <p style="font-size:13px;color:#2a1f1a;line-height:1.85;font-style:italic;padding-left:12px;border-left:3px solid ${primary.color};margin:12px 0 14px;">${primary.desc}</p>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+    <div style="background:#f0fdf4;border-radius:10px;padding:12px;border:1px solid #c8e6c9;">
+      <div style="font-size:10px;font-weight:bold;color:#2e7d32;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;">✓ Forces</div>
+      ${primary.forces.map(f=>`<div style="font-size:11px;color:#2a1f1a;margin-bottom:5px;line-height:1.5;">• ${f}</div>`).join("")}
+    </div>
+    <div style="background:#fff8f0;border-radius:10px;padding:12px;border:1px solid #ffcc80;">
+      <div style="font-size:10px;font-weight:bold;color:#e65100;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;">⚠ Points d'attention</div>
+      ${primary.defis.map(d=>`<div style="font-size:11px;color:#2a1f1a;margin-bottom:5px;line-height:1.5;">• ${d}</div>`).join("")}
+    </div>
+  </div>
+</div>
+<div style="background:#fff;border-radius:12px;padding:20px;margin-bottom:16px;border:1px solid #e8ddd4;">
+  <div style="font-size:14px;font-weight:bold;margin-bottom:14px;">📊 Répartition des 4 styles</div>
+  ${styleRows}
+  <p style="font-size:11px;color:#aaa;font-style:italic;margin-top:10px;">La plupart des personnes ont un style dominant et des traits secondaires — un profil "pur" est rare.</p>
+</div>
+${(subRows)?`<div style="background:#fff;border-radius:12px;padding:20px;margin-bottom:16px;border:1px solid #e8ddd4;"><div style="font-size:14px;font-weight:bold;margin-bottom:12px;">🔍 Sous-scores détaillés</div>${subRows}</div>`:""}
+<div style="background:#fff;border-radius:12px;padding:20px;margin-bottom:16px;border:1px solid #e8ddd4;">
+  <div style="font-size:14px;font-weight:bold;margin-bottom:12px;">💬 Pistes de travail & points d'attention</div>
+  ${adviceRows}
+</div>
+<p style="font-size:11px;color:#aaa;font-style:italic;line-height:1.7;margin-top:8px;">⚠️ Ces résultats sont indicatifs et basés sur tes propres réponses. Ils ne constituent pas un diagnostic clinique et ne remplacent pas un accompagnement professionnel.</p>
+</body></html>`;
+        window.emailjs.send(EMAILJS_SERVICE_ID,EMAILJS_TEMPLATE_ID,{to_email:email,prenom_client:prenom||"",html_content:html})
+          .then(()=>setSendStatus("success"))
+          .catch(err=>{
+            setEmailError(`Code : ${err?.status||""} — ${err?.text||err?.message||JSON.stringify(err)}`);
+            setSendStatus("error");
+          });
+      }catch(e){setEmailError(String(e));setSendStatus("error");}
+    };
+
+    return(
+      <div className="fade-up">
+        <div style={{textAlign:"center",padding:"24px 0 28px"}}>
+          <div style={{fontSize:44,marginBottom:10}}>{primary.icon}</div>
+          <div style={{fontSize:24,fontWeight:"bold",color:primary.color,marginBottom:4}}>{primary.label}</div>
+          <div style={{fontSize:13,color:MID,fontStyle:"italic"}}>Ton style d'attachement principal</div>
+        </div>
+
+        <div style={{background:"#fff",borderRadius:12,padding:20,marginBottom:14,border:"1px solid #e8ddd4"}}>
+          <div style={{fontSize:13,fontWeight:"bold",color:DARK,marginBottom:16}}>📊 Répartition des 4 styles</div>
+          {Object.entries(scores.pct).sort((a,b)=>b[1]-a[1]).map(([k,p])=>(
+            <ScoreBar key={k} label={STYLES[k].label} pct={p} color={STYLES[k].color} icon={STYLES[k].icon} isPrimary={k===scores.primary}/>
+          ))}
+          <div style={{fontSize:11,color:LIGHT,fontStyle:"italic",marginTop:10,lineHeight:1.6}}>La plupart des personnes ont un style dominant et des traits secondaires — un profil "pur" est rare.</div>
+        </div>
+
+        <div style={{background:"#fff",borderRadius:12,padding:20,marginBottom:14,border:`2px solid ${primary.color}30`}}>
+          <div style={{fontSize:14,fontWeight:"bold",color:primary.color,marginBottom:12}}>{primary.icon} {primary.label} — Ce que ça veut dire</div>
+          <p style={{fontSize:13,color:DARK,lineHeight:1.85,fontStyle:"italic",paddingLeft:12,borderLeft:`3px solid ${primary.color}`,marginBottom:16}}>{primary.desc}</p>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+            <div style={{background:"#f0fdf4",borderRadius:10,padding:14,border:"1px solid #c8e6c9"}}>
+              <div style={{fontSize:10,fontWeight:"bold",color:"#2e7d32",marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>✓ Tes forces</div>
+              {primary.forces.map((f,i)=><div key={i} style={{fontSize:11,color:DARK,marginBottom:6,lineHeight:1.55}}>• {f}</div>)}
+            </div>
+            <div style={{background:"#fff8f0",borderRadius:10,padding:14,border:"1px solid #ffcc80"}}>
+              <div style={{fontSize:10,fontWeight:"bold",color:"#e65100",marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>⚠ Points d'attention</div>
+              {primary.defis.map((d,i)=><div key={i} style={{fontSize:11,color:DARK,marginBottom:6,lineHeight:1.55}}>• {d}</div>)}
+            </div>
+          </div>
+        </div>
+
+        {hasSecondary&&(
+          <div style={{background:BG2,borderRadius:12,padding:16,marginBottom:14,border:"1px solid #e8ddd4"}}>
+            <div style={{fontSize:13,fontWeight:"bold",color:DARK,marginBottom:8}}>
+              {STYLES[secondary[0]].icon} Style secondaire notable : {STYLES[secondary[0]].label} ({secondary[1]}%)
+            </div>
+            <p style={{fontSize:12,color:MID,lineHeight:1.75,fontStyle:"italic"}}>
+              {secondary[0]==="A"&&"Une dimension anxieuse vient teinter tes relations — tu peux alterner entre des phases sécures et des moments d'hypervigilance affective."}
+              {secondary[0]==="Ev"&&"Une dimension évitante peut t'amener à prendre de la distance quand les choses deviennent trop intenses — même quand tu n'en as pas vraiment envie."}
+              {secondary[0]==="S"&&"Des ressources sécures bien présentes viennent équilibrer tes tendances principales. C'est une vraie force à reconnaître et à cultiver."}
+              {secondary[0]==="D"&&"Des moments de désorganisation peuvent surgir dans les situations de grande vulnérabilité — même si ton style dominant est différent au quotidien."}
+            </p>
+          </div>
+        )}
+
+        {showASubs&&(
+          <div style={{background:"#fff",borderRadius:12,padding:20,marginBottom:14,border:"1px solid #e8ddd4"}}>
+            <div style={{fontSize:13,fontWeight:"bold",color:DARK,marginBottom:4}}>🔍 Sous-scores : dimension anxieuse</div>
+            <div style={{fontSize:11,color:MID,fontStyle:"italic",marginBottom:14,lineHeight:1.6}}>L'anxiété d'attachement se décline en deux formes distinctes. Voici comment elles se répartissent chez toi.</div>
+            <SubScoreCard subKey="A-ab" pct={scores.subPct["A-ab"]}/>
+            <SubScoreCard subKey="A-rj" pct={scores.subPct["A-rj"]}/>
+            <div style={{marginTop:10,padding:"10px 14px",borderRadius:8,background:"#fff8f0",border:`1px dashed ${ACCENT}50`,fontSize:11,color:MID,fontStyle:"italic",lineHeight:1.7}}>
+              💬 Comprendre laquelle de ces deux dimensions est la plus active chez toi permet de cibler le travail thérapeutique de façon plus précise et efficace.
+            </div>
+          </div>
+        )}
+
+        {showEvSubs&&(
+          <div style={{background:"#fff",borderRadius:12,padding:20,marginBottom:14,border:"1px solid #e8ddd4"}}>
+            <div style={{fontSize:13,fontWeight:"bold",color:DARK,marginBottom:4}}>🔍 Sous-scores : dimension évitante</div>
+            <div style={{fontSize:11,color:MID,fontStyle:"italic",marginBottom:14,lineHeight:1.6}}>L'évitement prend deux formes différentes — l'une concerne les émotions, l'autre la proximité relationnelle.</div>
+            <SubScoreCard subKey="Ev-e" pct={scores.subPct["Ev-e"]}/>
+            <SubScoreCard subKey="Ev-i" pct={scores.subPct["Ev-i"]}/>
+            <div style={{marginTop:10,padding:"10px 14px",borderRadius:8,background:"#fff8f0",border:`1px dashed ${ACCENT}50`,fontSize:11,color:MID,fontStyle:"italic",lineHeight:1.7}}>
+              💬 Ces deux formes d'évitement appellent des approches différentes — l'une passe plus par le corps et la reconnexion émotionnelle, l'autre par l'exposition graduelle à l'intimité.
+            </div>
+          </div>
+        )}
+
+        <div style={{background:"#fff",borderRadius:12,padding:20,marginBottom:14,border:"1px solid #e8ddd4"}}>
+          <div style={{fontSize:13,fontWeight:"bold",color:DARK,marginBottom:14}}>💬 Pistes de travail & points d'attention</div>
+          {primary.conseils.map((c,i)=>(
+            <div key={i} style={{marginBottom:10,padding:"10px 14px",borderRadius:8,background:"#FFF8F2",border:`1px dashed ${ACCENT}60`,fontSize:12,color:MID,fontStyle:"italic",lineHeight:1.75}}>
+              {c}
+            </div>
+          ))}
+        </div>
+
+        <div style={{padding:"12px 16px",borderRadius:8,background:"#fff8f0",border:"1px solid #f0e0c8",fontSize:11,color:MID,fontStyle:"italic",lineHeight:1.7,marginBottom:20}}>
+          ⚠️ Ces résultats sont indicatifs et basés sur tes propres réponses. Ils ne constituent pas un diagnostic clinique et ne remplacent pas un accompagnement professionnel.
+        </div>
+
+        <div style={{background:"#fff",borderRadius:12,padding:20,border:"1px solid #e8ddd4"}}>
+          <div style={{fontSize:13,fontWeight:"bold",color:DARK,marginBottom:4}}>📧 Recevoir mes résultats par e-mail</div>
+          {email
+            ?<div style={{fontSize:12,color:MID,marginBottom:14}}>Les résultats seront envoyés à <b>{email}</b>.</div>
+            :<div style={{fontSize:12,color:"#F57C00",marginBottom:14}}>⚠️ Aucune adresse e-mail renseignée.</div>
+          }
+          {sendStatus!=="success"&&(
+            <button onClick={sendEmail} disabled={sendStatus==="sending"}
+              style={{padding:"11px 24px",borderRadius:24,border:"none",background:sendStatus==="sending"?"#ccc":ACCENT,color:"#fff",fontSize:14,fontWeight:"bold",transition:"background 0.2s"}}>
+              {sendStatus==="sending"?"📨 Envoi en cours…":"📧 Envoyer mes résultats"}
+            </button>
+          )}
+          {sendStatus==="success"&&<div style={{display:"flex",alignItems:"center",gap:8,color:"#4CAF50",fontSize:13}}><span style={{fontSize:18}}>✓</span> Résultats envoyés à {email}</div>}
+          {sendStatus==="error"&&(
+            <div style={{marginTop:10,fontSize:12,color:"#E53935",background:"#ffebee",borderRadius:8,padding:"12px 14px",lineHeight:1.8}}>
+              <b>✗ Envoi échoué.</b>
+              {emailError&&<div style={{marginTop:6,fontFamily:"monospace",fontSize:11,background:"#fff0f0",padding:"6px 10px",borderRadius:6,color:"#c62828"}}>{emailError}</div>}
+              <span onClick={sendEmail} style={{textDecoration:"underline",cursor:"pointer",marginTop:8,display:"inline-block",color:ACCENT}}>↺ Réessayer</span>
+            </div>
+          )}
+          {sendStatus==="no-email"&&<div style={{marginTop:10,fontSize:12,color:"#F57C00",background:"#fff8f0",borderRadius:8,padding:"10px 14px"}}>⚠️ Renseigne ton e-mail à l'étape 1.</div>}
+        </div>
+      </div>
+    );
+  }
+
+  function App(){
+    const [step,setStep]=useState(0);
+    const [prenom,setPrenom]=useState("");
+    const [email,setEmail]=useState("");
+    const [answers,setAnswers]=useState({});
+    const topRef=useRef(null);
+    const N=THEMES.length;
+
+    useEffect(()=>{ if(topRef.current)topRef.current.scrollIntoView({behavior:"smooth"}); },[step]);
+
+    const currentTheme=step>=1&&step<=N?THEMES[step-1]:null;
+    const themeAnswered=currentTheme?currentTheme.questions.every(q=>answers[q.id]!==undefined):true;
+    const scores=step===N+1?computeScores(answers):null;
+
+    return(
+      <div ref={topRef} style={{minHeight:"100vh",background:BG,padding:"32px 16px",fontFamily:"Georgia,serif"}}>
+        <div style={{maxWidth:640,margin:"0 auto"}}>
+
+          <div style={{marginBottom:step===0?28:16}}>
+            {step===0?(
+              <>
+                <div style={{fontSize:24,fontWeight:"bold",color:DARK,marginBottom:4}}>Style d'attachement</div>
+                <div style={{fontSize:13,color:MID,fontStyle:"italic",lineHeight:1.6}}>40 questions · 5 thèmes · Sous-scores détaillés</div>
+              </>
+            ):step<=N?<ProgressBar step={step} total={N}/>:null}
+          </div>
+
+          {step===0&&(
+            <div className="fade-up">
+              <div style={{background:"#fff",borderRadius:12,padding:22,marginBottom:16,border:"1px solid #e8ddd4"}}>
+                <p style={{fontSize:13,color:DARK,lineHeight:1.9,marginBottom:16}}>
+                  Le <b>style d'attachement</b> décrit la façon dont tu as appris à te relier aux autres — et à toi-même — dès l'enfance. Il influence profondément tes relations adultes, mais aussi ton rapport au travail, à l'argent et à ta propre valeur.
+                </p>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:16}}>
+                  {Object.values(STYLES).map(s=>(
+                    <div key={s.label} style={{padding:"10px 12px",borderRadius:10,background:s.color+"12",border:`1px solid ${s.color}25`,display:"flex",alignItems:"center",gap:8}}>
+                      <span style={{fontSize:16}}>{s.icon}</span>
+                      <div style={{fontSize:12,fontWeight:"bold",color:s.color}}>{s.label}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:6}}>
+                  {THEMES.map((t,i)=>(
+                    <div key={i} style={{padding:"8px 6px",borderRadius:8,background:BG2,textAlign:"center",border:"1px solid #e8ddd4"}}>
+                      <div style={{fontSize:16,marginBottom:3}}>{t.icon}</div>
+                      <div style={{fontSize:9,color:MID,lineHeight:1.4}}>{t.title}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{background:BG2,borderRadius:12,padding:20,marginBottom:16,border:"1px solid #e8ddd4"}}>
+                <div style={{fontSize:13,fontWeight:"bold",color:DARK,marginBottom:14}}>Quelques infos pour personnaliser tes résultats</div>
+                <div style={{marginBottom:12}}>
+                  <div style={{fontSize:12,color:MID,marginBottom:4,fontWeight:"bold"}}>Prénom</div>
+                  <input value={prenom} onChange={e=>setPrenom(e.target.value)} placeholder="Ton prénom..."
+                    style={{width:"100%",padding:"10px 14px",borderRadius:8,border:"1.5px solid #e0d4c8",background:"#fff",fontSize:14,color:DARK,outline:"none"}}/>
+                </div>
+                <div>
+                  <div style={{fontSize:12,color:MID,marginBottom:4,fontWeight:"bold"}}>Adresse e-mail</div>
+                  <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="ton@email.com"
+                    style={{width:"100%",padding:"10px 14px",borderRadius:8,border:"1.5px solid #e0d4c8",background:"#fff",fontSize:14,color:DARK,outline:"none"}}/>
+                  <div style={{display:"flex",alignItems:"center",gap:6,marginTop:8,background:"#f0fdf4",borderRadius:8,padding:"8px 12px"}}>
+                    <span>🔒</span>
+                    <span style={{fontSize:11,color:"#4CAF50",fontStyle:"italic"}}>Uniquement pour t'envoyer tes résultats. Aucun spam.</span>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{fontSize:12,color:LIGHT,fontStyle:"italic",marginBottom:16,lineHeight:1.7,padding:"10px 14px",background:"#fff",borderRadius:8,border:"1px solid #e8ddd4"}}>
+                ℹ️ Réponds spontanément avec ta première impression — il n'y a pas de bonnes ou mauvaises réponses. Le questionnaire prend environ 8–10 minutes.
+              </div>
+            </div>
+          )}
+
+          {currentTheme&&(
+            <div className="fade-up" key={step}>
+              <div style={{marginBottom:22,padding:"14px 16px",background:"#fff",borderRadius:10,border:`1px solid ${ACCENT}30`,borderLeft:`4px solid ${ACCENT}`}}>
+                <div style={{fontSize:15,fontWeight:"bold",color:DARK,marginBottom:3}}>{currentTheme.icon} {currentTheme.title}</div>
+                <div style={{fontSize:12,color:MID,fontStyle:"italic"}}>{currentTheme.subtitle}</div>
+              </div>
+              {currentTheme.questions.map((q,i)=>(
+                <LikertQuestion key={q.id} question={q} value={answers[q.id]} onChange={val=>setAnswers(a=>({...a,[q.id]:val}))} index={i}/>
+              ))}
+              {!themeAnswered&&<div style={{fontSize:12,color:"#F57C00",fontStyle:"italic",marginBottom:12}}>⚠️ Réponds à toutes les affirmations pour continuer.</div>}
+            </div>
+          )}
+
+          {step===N+1&&scores&&<Results scores={scores} prenom={prenom} email={email}/>}
+
+          {step<=N&&(
+            <div style={{display:"flex",justifyContent:"space-between",marginTop:24}}>
+              {step>0?<button onClick={()=>setStep(s=>s-1)} style={{padding:"12px 24px",borderRadius:24,border:"1.5px solid #e0d4c8",background:"#fff",color:MID,fontSize:14}}>← Retour</button>:<div/>}
+              <button onClick={()=>setStep(s=>s+1)} disabled={!themeAnswered&&step>0}
+                style={{padding:"12px 28px",borderRadius:24,border:"none",background:(!themeAnswered&&step>0)?"#e0d4c8":ACCENT,color:"#fff",fontSize:14,fontWeight:"bold",opacity:(!themeAnswered&&step>0)?0.6:1,transition:"all 0.2s"}}>
+                {step===0?"Commencer →":step===N?"Voir mes résultats →":"Continuer →"}
+              </button>
+            </div>
+          )}
+          {step===N+1&&(
+            <div style={{marginTop:24,textAlign:"center"}}>
+              <button onClick={()=>{setStep(0);setAnswers({});}} style={{padding:"12px 28px",borderRadius:24,border:`1.5px solid ${ACCENT}`,background:"transparent",color:ACCENT,fontSize:14}}>
+                ↺ Recommencer
+              </button>
+            </div>
+          )}
+
+        </div>
+      </div>
+    );
+  }
+
+  ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
