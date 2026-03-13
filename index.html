@@ -335,6 +335,19 @@ ${(subRows)?`<div style="background:#fff;border-radius:12px;padding:20px;margin-
   ${adviceRows}
 </div>
 <p style="font-size:11px;color:#aaa;font-style:italic;line-height:1.7;margin-top:8px;">⚠️ Ces résultats sont indicatifs et basés sur tes propres réponses. Ils ne constituent pas un diagnostic clinique et ne remplacent pas un accompagnement professionnel.</p>
+${scores.primary==="S"?`
+<div style="background:linear-gradient(135deg,#f0fdf4,#e8f5e9);border-radius:14px;padding:24px;margin-top:20px;border:1px solid #c8e6c9;text-align:center;">
+  <div style="font-size:28px;margin-bottom:8px;">🌿</div>
+  <div style="font-size:15px;font-weight:bold;color:#2e7d32;margin-bottom:10px;">Ton attachement est une vraie ressource</div>
+  <p style="font-size:12px;color:#3a5a3a;line-height:1.8;margin-bottom:18px;font-style:italic;">Ton style sécure ne nécessite pas de travail particulier sur cette thématique. Cela dit, si d'autres sujets méritent d'être explorés, un accompagnement peut toujours ouvrir de nouveaux espaces.</p>
+  <a href="https://resalib.fr/p/123056" style="display:inline-block;padding:13px 28px;border-radius:24px;background:#388e3c;color:#fff;font-size:13px;font-weight:bold;text-decoration:none;">📞 Réserver un appel découverte gratuit</a>
+</div>`:`
+<div style="background:linear-gradient(135deg,#fdf6ed,#f5ece0);border-radius:14px;padding:24px;margin-top:20px;border:1px solid #e0c9a8;text-align:center;">
+  <div style="font-size:28px;margin-bottom:8px;">🌱</div>
+  <div style="font-size:15px;font-weight:bold;color:#a0522d;margin-bottom:10px;">Tu veux aller plus loin ?</div>
+  <p style="font-size:12px;color:#6b5246;line-height:1.8;margin-bottom:18px;font-style:italic;">Comprendre son style d'attachement, c'est déjà un grand pas. Le vrai changement se fait dans la relation — avec soi, avec les autres, accompagné(e) d'un regard extérieur bienveillant. Si tu souhaites explorer ce que ces patterns activent dans ta vie, je suis là pour ça.</p>
+  <a href="https://resalib.fr/p/123056" style="display:inline-block;padding:13px 28px;border-radius:24px;background:#c9784c;color:#fff;font-size:13px;font-weight:bold;text-decoration:none;">📞 Réserver mon appel découverte gratuit</a>
+</div>`}
 </body></html>`;
         window.emailjs.send(EMAILJS_SERVICE_ID,EMAILJS_TEMPLATE_ID,{to_email:email,prenom_client:prenom||"",html_content:html})
           .then(()=>setSendStatus("success"))
