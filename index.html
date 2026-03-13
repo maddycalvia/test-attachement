@@ -376,6 +376,32 @@ ${(subRows)?`<div style="background:#fff;border-radius:12px;padding:20px;margin-
           </div>
         </div>
 
+        {scores.primary==="S"?(
+          <div style={{background:"linear-gradient(135deg,#f0fdf4,#e8f5e9)",borderRadius:14,padding:22,marginBottom:14,border:"1px solid #c8e6c9",textAlign:"center"}}>
+            <div style={{fontSize:20,marginBottom:8}}>🌿</div>
+            <div style={{fontSize:14,fontWeight:"bold",color:"#2e7d32",marginBottom:10}}>Ton attachement est une vraie ressource</div>
+            <p style={{fontSize:12,color:"#3a5a3a",lineHeight:1.8,marginBottom:16,fontStyle:"italic"}}>
+              Ton style sécure ne nécessite pas de travail particulier sur cette thématique. Cela dit, si d'autres sujets — confiance en toi, relations, patterns de vie — méritent d'être explorés, un accompagnement peut toujours ouvrir de nouveaux espaces. La sécurité est un point de départ, pas un plafond.
+            </p>
+            <a href="https://resalib.fr/p/123056" target="_blank" rel="noopener noreferrer"
+              style={{display:"inline-block",padding:"13px 28px",borderRadius:24,background:"#388e3c",color:"#fff",fontSize:13,fontWeight:"bold",textDecoration:"none",boxShadow:"0 4px 14px rgba(56,142,60,0.25)"}}>
+              📞 Réserver un appel découverte gratuit
+            </a>
+          </div>
+        ):(
+          <div style={{background:"linear-gradient(135deg,#fdf6ed,#f5ece0)",borderRadius:14,padding:22,marginBottom:14,border:`1px solid ${ACCENT}40`,textAlign:"center"}}>
+            <div style={{fontSize:20,marginBottom:8}}>🌱</div>
+            <div style={{fontSize:14,fontWeight:"bold",color:ACCENT,marginBottom:10}}>Tu veux aller plus loin ?</div>
+            <p style={{fontSize:12,color:MID,lineHeight:1.8,marginBottom:16,fontStyle:"italic"}}>
+              Comprendre son style d'attachement, c'est déjà un grand pas. Mais le vrai changement se fait dans la relation — avec soi, avec les autres, accompagné(e) d'un regard extérieur bienveillant. Si tu souhaites explorer ce que ces patterns activent dans ta vie et commencer à les transformer, je suis là pour ça.
+            </p>
+            <a href="https://resalib.fr/p/123056" target="_blank" rel="noopener noreferrer"
+              style={{display:"inline-block",padding:"13px 28px",borderRadius:24,background:ACCENT,color:"#fff",fontSize:13,fontWeight:"bold",textDecoration:"none",boxShadow:`0 4px 14px ${ACCENT}40`}}>
+              📞 Réserver mon appel découverte gratuit
+            </a>
+          </div>
+        )}
+
         {hasSecondary&&(
           <div style={{background:BG2,borderRadius:12,padding:16,marginBottom:14,border:"1px solid #e8ddd4"}}>
             <div style={{fontSize:13,fontWeight:"bold",color:DARK,marginBottom:8}}>
@@ -557,6 +583,12 @@ ${(subRows)?`<div style="background:#fff;border-radius:12px;padding:20px;margin-
               <button onClick={()=>{setStep(0);setAnswers({});}} style={{padding:"12px 28px",borderRadius:24,border:`1.5px solid ${ACCENT}`,background:"transparent",color:ACCENT,fontSize:14}}>
                 ↺ Recommencer
               </button>
+              <div style={{marginTop:24}}>
+                <a href="https://resalib.fr/p/123056" target="_blank" rel="noopener noreferrer"
+                  style={{display:"inline-block",padding:"14px 32px",borderRadius:24,background:ACCENT,color:"#fff",fontSize:15,fontWeight:"bold",textDecoration:"none",boxShadow:"0 4px 16px rgba(0,0,0,0.15)"}}>
+                  📞 Réserver mon appel découverte gratuit
+                </a>
+              </div>
             </div>
           )}
 
