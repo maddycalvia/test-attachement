@@ -105,6 +105,36 @@
     },
   ];
 
+  const CHILDHOOD_THEME = {
+    title:"Ton enfance & tes figures d'attachement",
+    subtitle:"Comment tu décris ta relation avec tes parents (ou figures parentales) dans l'enfance. Réponds selon ce dont tu te souviens, même si c'est flou ou partiel.",
+    icon:"🌱",
+    questions:[
+      // Sécurité de base
+      {id:"c1",  style:"S",    text:"Ma mère (ou figure maternelle) était émotionnellement disponible et répondait à mes besoins de façon cohérente."},
+      {id:"c2",  style:"S",    text:"Mon père (ou figure paternelle) était présent, fiable et cohérent dans sa façon de se relier à moi."},
+      {id:"c3",  style:"S",    text:"Je me sentais en sécurité à la maison — pas seulement physiquement, mais aussi émotionnellement."},
+      {id:"c4",  style:"S",    text:"Quand j'étais triste, blessé(e) ou en difficulté, je savais que je pouvais me tourner vers un adulte de confiance."},
+      // Anxiété d'abandon
+      {id:"c5",  style:"A-ab", text:"J'avais souvent peur que mes parents ne soient pas là quand j'en avais vraiment besoin — émotionnellement ou physiquement."},
+      {id:"c6",  style:"A-ab", text:"L'amour de mes parents me semblait parfois conditionnel — j'avais l'impression de devoir le mériter plutôt que de le recevoir librement."},
+      {id:"c7",  style:"A-ab", text:"J'ai vécu des séparations, des absences ou des pertes importantes dans mon enfance qui m'ont marqué(e)."},
+      // Anxiété de rejet
+      {id:"c8",  style:"A-rj", text:"Je cherchais beaucoup l'approbation de mes parents et j'avais souvent peur de les décevoir ou de mal faire."},
+      {id:"c9",  style:"A-rj", text:"Je modifiais mon comportement ou ce que je montrais de moi pour être aimé(e) ou accepté(e) à la maison."},
+      // Évitement émotionnel
+      {id:"c10", style:"Ev-e", text:"Dans ma famille, les émotions n'avaient pas vraiment de place — on les taisait, on les minimisait, ou elles n'étaient pas nommées."},
+      {id:"c11", style:"Ev-e", text:"J'ai appris tôt qu'il valait mieux gérer mes émotions seul(e) — les exprimer ne changeait rien ou empirait les choses."},
+      // Évitement de l'intimité
+      {id:"c12", style:"Ev-i", text:"J'ai appris tôt à ne pas trop exprimer mes besoins à la maison — c'était inutile, mal accueilli, ou source de tension."},
+      {id:"c13", style:"Ev-i", text:"On attendait de moi que je sois autonome, fort(e) ou débrouillard(e) — demander de l'aide n'était pas vraiment encouragé."},
+      // Désorganisé
+      {id:"c14", style:"D",    text:"Ma relation avec ma figure parentale principale était imprévisible — source de réconfort à certains moments, de peur ou de confusion à d'autres."},
+      {id:"c15", style:"D",    text:"J'ai vécu des situations où celui ou celle qui était censé(e) me protéger était aussi une source de peur ou de danger."},
+      {id:"c16", style:"D",    text:"Mon enfance a été marquée par des événements difficiles (violence, abus, négligence grave, instabilité majeure) qui ont laissé des traces durables."},
+    ]
+  };
+
   const LIKERT=[
     {val:1,label:"Pas moi"},
     {val:2,label:"Rarement"},
@@ -200,13 +230,84 @@
     return{raw,agg,pct,norm,primary,subPct};
   }
 
+  function computeChildhoodScores(answers){
+    const raw={"S":0,"A-ab":0,"A-rj":0,"Ev-e":0,"Ev-i":0,"D":0};
+    CHILDHOOD_THEME.questions.forEach(q=>{raw[q.style]+=(answers[q.id]||0);});
+    const agg={S:raw["S"],A:raw["A-ab"]+raw["A-rj"],Ev:raw["Ev-e"]+raw["Ev-i"],D:raw["D"]};
+    // max possible: S=4q×5=20, A=(3+2)q×5=25, Ev=(2+2)q×5=20, D=3q×5=15
+    const maxPossible={S:20,A:25,Ev:20,D:15};
+    const norm={};Object.keys(agg).forEach(k=>{norm[k]=agg[k]/maxPossible[k];});
+    const total=Object.values(norm).reduce((a,b)=>a+b,0);
+    const pct={};Object.keys(norm).forEach(k=>{pct[k]=total>0?Math.round((norm[k]/total)*100):25;});
+    const primary=Object.entries(norm).sort((a,b)=>b[1]-a[1])[0][0];
+    return{raw,agg,pct,norm,primary};
+  }
+
+  function computeDeepInsights(answers, scores, childhoodScores){
+    // 1. Score par thème actuel : ratio insécurité (non-S) vs total
+    const themeData = THEMES.map((t,i)=>{
+      let insecureSum=0, secureSum=0, insecureMax=0, secureMax=0;
+      t.questions.forEach(q=>{
+        const val=answers[q.id]||0;
+        if(q.style==="S"){ secureSum+=val; secureMax+=5; }
+        else { insecureSum+=val; insecureMax+=5; }
+      });
+      const insecureRate = insecureMax>0 ? insecureSum/insecureMax : 0;
+      const secureRate   = secureMax>0  ? secureSum/secureMax   : 0;
+      // activation = insécurité forte ET sécurité faible
+      const activation = insecureRate - secureRate;
+      return { index:i, theme:t, insecureRate, secureRate, activation };
+    });
+
+    // 2. Thème le plus activé (insécurité la plus forte)
+    const hotTheme = [...themeData].sort((a,b)=>b.activation-a.activation)[0];
+    // Thème le plus sécure
+    const calmTheme = [...themeData].sort((a,b)=>a.activation-b.activation)[0];
+
+    // 3. Cohérence vs situationnel : écart-type des activations
+    const activations = themeData.map(t=>t.activation);
+    const mean = activations.reduce((a,b)=>a+b,0)/activations.length;
+    const variance = activations.reduce((a,b)=>a+(b-mean)**2,0)/activations.length;
+    const stdDev = Math.sqrt(variance);
+    // stdDev > 0.22 = style très contextuel, < 0.1 = très stable
+    const isContextual = stdDev > 0.20;
+    const isMixed = stdDev > 0.28;
+
+    // 4. Rapport à soi vs relations (thème index 3 = "attachement à soi")
+    const selfTheme = themeData[3];  // index 3
+    const relationalAvgActivation = [0,1,2].reduce((a,i)=>a+themeData[i].activation,0)/3;
+    const selfVsRelational = selfTheme.activation - relationalAvgActivation;
+    // positif = soi plus abîmé que les relations ; négatif = relations plus dures que rapport à soi
+
+    // 5. Travail/argent comme refuge ou terrain miné (thème index 4)
+    const workTheme = themeData[4];
+    const relationalWorstActivation = Math.max(...[0,1,2].map(i=>themeData[i].activation));
+    const workVsRelational = workTheme.activation - relationalAvgActivation;
+    // workVsRelational > 0.15 = travail plus insécure que relations → terrain miné
+    // workVsRelational < -0.15 = travail plus sécure → refuge possible
+
+    // 6. Tension anxieux/évitant (signature désorganisée cachée)
+    const aPct = scores.pct["A"] || 0;
+    const evPct = scores.pct["Ev"] || 0;
+    const hasHiddenD = scores.primary !== "D" && aPct >= 25 && evPct >= 25;
+
+    return { themeData, hotTheme, calmTheme, stdDev, isContextual, isMixed,
+             selfTheme, selfVsRelational, workTheme, workVsRelational,
+             hasHiddenD, aPct, evPct };
+  }
+
   function ProgressBar({step,total}){
     const pct=((step-1)/(total-1))*100;
+    const isChildhood = step===1;
+    const label = isChildhood
+      ? `${CHILDHOOD_THEME.icon} ${CHILDHOOD_THEME.title}`
+      : `${THEMES[step-2]?.icon} ${THEMES[step-2]?.title}`;
+    const stepLabel = isChildhood ? "Enfance · Thème 1/"+total : `Thème ${step}/${total}`;
     return(
       <div style={{marginBottom:20}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-          <div style={{fontSize:12,color:MID,fontStyle:"italic"}}>{THEMES[step-1]?.icon} {THEMES[step-1]?.title}</div>
-          <div style={{fontSize:11,color:LIGHT}}>Thème {step}/{total}</div>
+          <div style={{fontSize:12,color:MID,fontStyle:"italic"}}>{label}</div>
+          <div style={{fontSize:11,color:LIGHT}}>{stepLabel}</div>
         </div>
         <div style={{background:"#e8ddd4",borderRadius:8,height:5,overflow:"hidden"}}>
           <div style={{width:`${pct}%`,height:"100%",background:ACCENT,borderRadius:8,transition:"width 0.4s ease"}}/>
@@ -283,7 +384,223 @@
     );
   }
 
-  function Results({scores,prenom,email}){
+  function ChildhoodVsCurrentCard({childhoodScores,currentScores}){
+    const chP=STYLES[childhoodScores.primary];
+    const cuP=STYLES[currentScores.primary];
+    const same=childhoodScores.primary===currentScores.primary;
+    const narratives={
+      "S→S":"Ton attachement semble avoir été stable et sécure depuis l'enfance. C'est une vraie ressource — tu as bénéficié de bases solides qui continuent de te porter aujourd'hui.",
+      "S→A":"Quelque chose entre l'enfance et aujourd'hui a activé une dimension anxieuse. Des expériences relationnelles difficiles (rupture, perte, trahison) peuvent expliquer ce glissement.",
+      "S→Ev":"Tu pars d'une base plutôt sécure, mais quelque chose t'a amené(e) à te protéger davantage avec le temps. L'évitement peut être une réponse à des blessures accumulées.",
+      "S→D":"Un décalage significatif entre ton enfance et aujourd'hui. Des expériences relationnelles marquantes ont probablement laissé des traces qui méritent attention.",
+      "A→S":"Une belle évolution. Tu as réussi à développer une sécurité que l'enfance ne t'avait pas pleinement donnée. C'est ce qu'on appelle un attachement «sécure acquis».",
+      "A→A":"Les patterns anxieux appris dans l'enfance restent présents. Ce n'est pas une fatalité — c'est un terrain qui répond bien au travail thérapeutique ciblé.",
+      "A→Ev":"Face à l'anxiété, tu as peut-être développé une défense évitante avec le temps — une façon de ne plus souffrir de la même façon. Les deux styles coexistent souvent en dessous.",
+      "A→D":"La désorganisation peut émerger quand les stratégies anxieuses ne suffisent plus à contenir la tension. Un accompagnement peut aider à démêler ces couches.",
+      "Ev→S":"Malgré une enfance où l'expression émotionnelle était limitée, tu as développé une vraie sécurité intérieure. Un chemin remarquable.",
+      "Ev→A":"L'évitement de l'enfance a peut-être cédé la place à une anxiété plus visible — parfois un signe que tu oses davantage te connecter, même si c'est douloureux.",
+      "Ev→Ev":"L'autosuffisance apprise dans l'enfance reste un mode dominant. Elle a été utile — la question est de savoir si elle sert encore ou si elle limite.",
+      "Ev→D":"Des couches de désorganisation sous un évitement de surface. Le travail corporel et traumatologique peut aider à accéder à ce qui est en dessous.",
+      "D→S":"Un chemin de transformation profond. Partir d'un attachement désorganisé pour développer une sécurité, c'est l'un des parcours les plus exigeants — et les plus significatifs.",
+      "D→A":"La désorganisation s'est en partie canalisée dans une dimension anxieuse. C'est parfois un progrès — l'anxiété est plus accessible que la désorganisation brute.",
+      "D→Ev":"Une stratégie défensive s'est installée pour gérer le chaos intérieur. L'évitement protège, mais peut aussi isoler.",
+      "D→D":"Tu portes encore les traces d'un attachement désorganisé. Ce n'est pas un manque de volonté — c'est un héritage lourd à tenir seul(e). Un accompagnement adapté fait une vraie différence.",
+    };
+    const key=`${childhoodScores.primary}→${currentScores.primary}`;
+    const narrative=narratives[key]||(same
+      ? "Ton style d'attachement semble cohérent entre l'enfance et aujourd'hui — les patterns appris tôt restent actifs dans ta vie adulte."
+      : "Tu as évolué depuis l'enfance. Quelque chose dans ton parcours t'a permis de te déplacer vers un style différent — une vraie forme de résilience.");
+    const isEarnedSecure = currentScores.primary === "S" && childhoodScores.primary !== "S";
+    return(
+      <div style={{background:"#fff",borderRadius:12,padding:20,marginBottom:14,border:"1px solid #e8ddd4"}}>
+        <div style={{fontSize:13,fontWeight:"bold",color:DARK,marginBottom:16}}>🧭 Ton parcours d'attachement</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr auto 1fr",gap:12,alignItems:"center",marginBottom:16}}>
+          <div style={{textAlign:"center",padding:14,borderRadius:10,background:chP.color+"10",border:`1px solid ${chP.color}30`}}>
+            <div style={{fontSize:24}}>{chP.icon}</div>
+            <div style={{fontSize:9,color:MID,marginTop:4,marginBottom:3,textTransform:"uppercase",letterSpacing:0.5}}>Enfance</div>
+            <div style={{fontSize:12,fontWeight:"bold",color:chP.color}}>{chP.label}</div>
+          </div>
+          <div style={{textAlign:"center",fontSize:20,color:LIGHT}}>→</div>
+          <div style={{textAlign:"center",padding:14,borderRadius:10,background:cuP.color+"10",border:`1px solid ${cuP.color}30`}}>
+            <div style={{fontSize:24}}>{cuP.icon}</div>
+            <div style={{fontSize:9,color:MID,marginTop:4,marginBottom:3,textTransform:"uppercase",letterSpacing:0.5}}>Aujourd'hui</div>
+            <div style={{fontSize:12,fontWeight:"bold",color:cuP.color}}>{cuP.label}</div>
+          </div>
+        </div>
+        <p style={{fontSize:12,color:MID,lineHeight:1.8,fontStyle:"italic",padding:"10px 14px",borderRadius:8,background:"#FFF8F2",border:`1px dashed ${ACCENT}50`}}>
+          {narrative}
+        </p>
+        {isEarnedSecure&&(
+          <div style={{marginTop:10,padding:"8px 12px",borderRadius:8,background:"#f0fdf4",border:"1px solid #c8e6c9",fontSize:11,color:"#2e7d32",lineHeight:1.6}}>
+            ✓ L'évolution entre ton style d'enfance et ton style actuel est significative. C'est ce que la recherche appelle un «attachement sécure acquis» — une vraie forme de résilience relationnelle.
+          </div>
+        )}
+        <div style={{marginTop:16}}>
+          <div style={{fontSize:11,fontWeight:"bold",color:MID,marginBottom:10,textTransform:"uppercase",letterSpacing:0.5}}>📊 Répartition enfance vs aujourd'hui</div>
+          {Object.entries(STYLES).map(([k,s])=>{
+            const cPct=childhoodScores.pct[k]||0;
+            const uPct=currentScores.pct[k]||0;
+            const diff=uPct-cPct;
+            return(
+              <div key={k} style={{marginBottom:10}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                  <div style={{display:"flex",alignItems:"center",gap:6}}>
+                    <span style={{fontSize:13}}>{s.icon}</span>
+                    <span style={{fontSize:11,color:DARK}}>{s.label}</span>
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:10}}>
+                    <span style={{fontSize:10,color:MID}}>Enfance <b style={{color:s.color}}>{cPct}%</b></span>
+                    <span style={{fontSize:10,color:MID}}>Aujourd'hui <b style={{color:s.color}}>{uPct}%</b></span>
+                    {diff!==0&&<span style={{fontSize:9,padding:"1px 6px",borderRadius:8,background:diff>0?"#f0fdf4":"#ffebee",color:diff>0?"#2e7d32":"#c62828",fontWeight:"bold"}}>{diff>0?"+":""}{diff}%</span>}
+                  </div>
+                </div>
+                <div style={{position:"relative",background:"#e8ddd4",borderRadius:6,height:7,overflow:"hidden"}}>
+                  <div style={{position:"absolute",left:0,top:0,height:"100%",width:`${cPct}%`,background:s.color+"55",borderRadius:6}}/>
+                  <div style={{position:"absolute",left:0,top:0,height:"100%",width:`${uPct}%`,background:s.color,borderRadius:6,opacity:0.85}}/>
+                </div>
+              </div>
+            );
+          })}
+          <div style={{fontSize:9,color:LIGHT,fontStyle:"italic",marginTop:8,lineHeight:1.5}}>Barre claire = enfance · Barre pleine = aujourd'hui</div>
+        </div>
+        <div style={{marginTop:12,fontSize:10,color:LIGHT,fontStyle:"italic",lineHeight:1.5}}>
+          ⚠ Ce bilan enfance est basé sur ton ressenti actuel de ton passé — non sur des souvenirs objectifs. Il donne une indication, pas un diagnostic.
+        </div>
+      </div>
+    );
+  }
+
+  function DeepInsightsCard({insights, scores}){
+    const { hotTheme, calmTheme, isContextual, isMixed, stdDev,
+            selfVsRelational, workVsRelational, hasHiddenD, aPct, evPct } = insights;
+
+    const insightItems = [];
+
+    // — Thème le plus activé
+    const hotActivationPct = Math.round(hotTheme.activation * 100);
+    insightItems.push({
+      icon: hotTheme.theme.icon,
+      title: `Ton point d'activation principal : ${hotTheme.theme.title}`,
+      body: `C'est dans ce domaine que tes patterns insécures s'activent le plus fortement. Les questions sur ${hotTheme.theme.title.toLowerCase()} ont révélé une tension plus élevée qu'ailleurs — c'est souvent là que le travail est le plus fécond.`,
+      color: "#C97A50",
+      bg: "#FFF8F2",
+      border: "#C97A5040",
+    });
+
+    // — Thème le plus sécure (si différent du hotTheme)
+    if(calmTheme.index !== hotTheme.index){
+      insightItems.push({
+        icon: calmTheme.theme.icon,
+        title: `Ta zone de sécurité : ${calmTheme.theme.title}`,
+        body: `C'est le domaine où tu sembles le plus ancré(e) et à l'aise. Cette ressource peut servir de point d'appui pour travailler les zones plus instables.`,
+        color: "#4CAF50",
+        bg: "#f0fdf4",
+        border: "#4CAF5040",
+      });
+    }
+
+    // — Style contextuel vs stable
+    if(isMixed){
+      insightItems.push({
+        icon: "🎭",
+        title: "Un style très contextuel",
+        body: `Tes réponses varient beaucoup selon les thèmes — ce qui suggère que ton style d'attachement dépend fortement du contexte. Tu peux être sécure dans certains domaines et très insécure dans d'autres. C'est un profil «en mosaïque» : plus nuancé, mais aussi plus difficile à lire pour toi-même.`,
+        color: "#7B1FA2",
+        bg: "#f9f5ff",
+        border: "#7B1FA240",
+      });
+    } else if(isContextual){
+      insightItems.push({
+        icon: "🔀",
+        title: "Un style plutôt situationnel",
+        body: `Ton style d'attachement n'est pas uniforme — il varie modérément selon les contextes. Certains domaines de ta vie activent davantage tes patterns que d'autres. C'est une information précieuse : les difficultés ne viennent pas de «toi en général», mais de situations spécifiques.`,
+        color: "#1976D2",
+        bg: "#f0f7ff",
+        border: "#1976D240",
+      });
+    } else {
+      insightItems.push({
+        icon: "🧭",
+        title: "Un style cohérent et stable",
+        body: `Tes patterns d'attachement sont similaires dans tous les domaines de ta vie — relations, conflits, rapport à soi, travail. Cette cohérence indique un style bien ancré, qui se manifeste de façon uniforme quelle que soit la situation.`,
+        color: "#455A64",
+        bg: "#f5f7f8",
+        border: "#455A6440",
+      });
+    }
+
+    // — Rapport à soi vs relations
+    if(selfVsRelational > 0.18){
+      insightItems.push({
+        icon: "🪞",
+        title: "Le rapport à soi : ton terrain le plus difficile",
+        body: `Tes patterns insécures s'expriment plus fortement dans ta relation à toi-même (estime de soi, voix intérieure, auto-compassion) que dans tes relations aux autres. C'est un signal important : avant même de travailler les liens extérieurs, la relation à soi mérite une attention particulière.`,
+        color: "#7B1FA2",
+        bg: "#f9f5ff",
+        border: "#7B1FA240",
+      });
+    } else if(selfVsRelational < -0.18){
+      insightItems.push({
+        icon: "🪞",
+        title: "Le rapport à soi : une ressource intérieure",
+        body: `Tu sembles avoir une relation à toi-même plus stable que ta relation aux autres. Ton estime de soi et ta voix intérieure constituent une base solide — même si les liens extérieurs restent complexes. C'est une ressource à reconnaître et à mobiliser dans le travail relationnel.`,
+        color: "#4CAF50",
+        bg: "#f0fdf4",
+        border: "#4CAF5040",
+      });
+    }
+
+    // — Travail/argent
+    if(workVsRelational > 0.18){
+      insightItems.push({
+        icon: "⚙️",
+        title: "Le travail & l'argent : un terrain d'activation fort",
+        body: `Tes patterns insécures s'activent plus fortement dans la sphère professionnelle et financière que dans tes relations. Le travail peut devenir un lieu de rejeu de blessures anciennes — besoin de validation, peur d'échouer, sabotage au moment de réussir. Une piste de réflexion à ne pas négliger.`,
+        color: "#F57C00",
+        bg: "#fff8f0",
+        border: "#F57C0040",
+      });
+    } else if(workVsRelational < -0.18){
+      insightItems.push({
+        icon: "⚙️",
+        title: "Le travail : un espace de sécurité relative",
+        body: `Le domaine professionnel et financier semble être un espace où tu te sens plus en contrôle et en sécurité qu'ailleurs. C'est parfois une vraie ressource — parfois aussi un refuge face à des relations plus complexes. La nuance vaut la peine d'être explorée.`,
+        color: "#1976D2",
+        bg: "#f0f7ff",
+        border: "#1976D240",
+      });
+    }
+
+    // — Tension A+Ev cachée
+    if(hasHiddenD){
+      insightItems.push({
+        icon: "⚡",
+        title: "Une tension anxieux / évitant notable",
+        body: `Même si ton style principal n'est pas désorganisé, tu présentes des scores significatifs à la fois sur la dimension anxieuse (${aPct}%) et évitante (${evPct}%). Cette coexistence — vouloir du lien ET s'en protéger — peut générer une ambivalence intérieure importante. C'est souvent le signe d'une désorganisation sous-jacente qui mérite attention.`,
+        color: "#7B1FA2",
+        bg: "#f9f5ff",
+        border: "#7B1FA240",
+      });
+    }
+
+    return(
+      <div style={{background:"#fff",borderRadius:12,padding:20,marginBottom:14,border:"1px solid #e8ddd4"}}>
+        <div style={{fontSize:13,fontWeight:"bold",color:DARK,marginBottom:4}}>🔎 Ce que tes réponses révèlent en détail</div>
+        <div style={{fontSize:11,color:MID,fontStyle:"italic",marginBottom:16,lineHeight:1.6}}>Insights supplémentaires extraits de l'analyse thème par thème.</div>
+        {insightItems.map((item,i)=>(
+          <div key={i} style={{marginBottom:12,padding:"12px 14px",borderRadius:10,background:item.bg,border:`1px solid ${item.border}`}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+              <span style={{fontSize:16}}>{item.icon}</span>
+              <span style={{fontSize:12,fontWeight:"bold",color:item.color}}>{item.title}</span>
+            </div>
+            <p style={{fontSize:11,color:MID,lineHeight:1.75,margin:0}}>{item.body}</p>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  function Results({scores,childhoodScores,answers,prenom,email}){
     const [sendStatus,setSendStatus]=useState("idle");
     const [emailError,setEmailError]=useState(null);
     const primary=STYLES[scores.primary];
@@ -291,6 +608,7 @@
     const hasSecondary=secondary&&secondary[1]>=22;
     const showASubs=scores.primary==="A"||(hasSecondary&&secondary[0]==="A")||scores.pct["A"]>=20;
     const showEvSubs=scores.primary==="Ev"||(hasSecondary&&secondary[0]==="Ev")||scores.pct["Ev"]>=20;
+    const insights=computeDeepInsights(answers,scores,childhoodScores);
 
     const sendEmail=()=>{
       if(!email){setSendStatus("no-email");return;}
@@ -298,7 +616,57 @@
       if(!window.emailjs){setEmailError("EmailJS non chargé.");setSendStatus("error");return;}
       try{
         window.emailjs.init({publicKey:EMAILJS_PUBLIC_KEY});
-        const styleRows=Object.entries(scores.pct).sort((a,b)=>b[1]-a[1]).map(([k,p])=>{
+        const chP=STYLES[childhoodScores.primary];
+        const cuP=STYLES[scores.primary];
+        const isEarnedSecure=scores.primary==="S"&&childhoodScores.primary!=="S";
+        const childhoodRow=`
+<div style="background:#fff;border-radius:12px;padding:20px;margin-bottom:16px;border:1px solid #e8ddd4;">
+  <div style="font-size:14px;font-weight:bold;margin-bottom:14px;">🧭 Ton parcours d'attachement</div>
+  <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:center;margin-bottom:14px;">
+    <div style="text-align:center;padding:12px;border-radius:10px;background:${chP.color}12;border:1px solid ${chP.color}30;">
+      <div style="font-size:20px;">${chP.icon}</div>
+      <div style="font-size:9px;color:#6b5246;margin:4px 0 2px;text-transform:uppercase;">Enfance</div>
+      <div style="font-size:12px;font-weight:bold;color:${chP.color};">${chP.label}</div>
+    </div>
+    <div style="text-align:center;font-size:18px;color:#aaa;">→</div>
+    <div style="text-align:center;padding:12px;border-radius:10px;background:${cuP.color}12;border:1px solid ${cuP.color}30;">
+      <div style="font-size:20px;">${cuP.icon}</div>
+      <div style="font-size:9px;color:#6b5246;margin:4px 0 2px;text-transform:uppercase;">Aujourd'hui</div>
+      <div style="font-size:12px;font-weight:bold;color:${cuP.color};">${cuP.label}</div>
+    </div>
+  </div>
+  ${isEarnedSecure?'<div style="padding:8px 12px;border-radius:8px;background:#f0fdf4;border:1px solid #c8e6c9;font-size:11px;color:#2e7d32;line-height:1.6;margin-bottom:14px;">✓ Une évolution significative vers un attachement sécure — ce que la recherche appelle un attachement sécure acquis.</div>':''}
+  <div style="font-size:11px;font-weight:bold;color:#6b5246;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;">📊 Répartition enfance vs aujourd'hui</div>
+  ${Object.entries(STYLES).map(([k,s])=>{
+    const cPct=childhoodScores.pct[k]||0;
+    const uPct=scores.pct[k]||0;
+    const diff=uPct-cPct;
+    const diffLabel=diff===0?"":(diff>0?`+${diff}%`:`${diff}%`);
+    const diffColor=diff>0?"#2e7d32":diff<0?"#c62828":"#aaa";
+    return`<div style="margin-bottom:12px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+    <span style="font-size:12px;color:#2a1f1a;">${s.icon} ${s.label}</span>
+    <span style="font-size:11px;color:#6b5246;">Enfance <b style="color:${s.color};">${cPct}%</b> &nbsp;→&nbsp; Aujourd'hui <b style="color:${s.color};">${uPct}%</b>${diffLabel?` &nbsp;<b style="font-size:10px;color:${diffColor};">(${diffLabel})</b>`:""}
+    </span>
+  </div>
+  <div style="margin-bottom:2px;">
+    <div style="font-size:8px;color:#aaa;margin-bottom:2px;">Enfance</div>
+    <div style="background:#e8ddd4;border-radius:4px;height:5px;overflow:hidden;">
+      <div style="height:5px;width:${cPct}%;background:${s.color};opacity:0.35;border-radius:4px;"></div>
+    </div>
+  </div>
+  <div>
+    <div style="font-size:8px;color:#aaa;margin-bottom:2px;">Aujourd'hui</div>
+    <div style="background:#e8ddd4;border-radius:4px;height:5px;overflow:hidden;">
+      <div style="height:5px;width:${uPct}%;background:${s.color};border-radius:4px;"></div>
+    </div>
+  </div>
+</div>`;
+  }).join("")}
+  <div style="font-size:9px;color:#aaa;font-style:italic;margin-top:6px;">Barre claire = enfance · Barre pleine = aujourd'hui</div>
+</div>`;
+        const styleRows=Object.entries(scores.pct)
+        .sort((a,b)=>b[1]-a[1]).map(([k,p])=>{
           const s=STYLES[k];
           return`<div style="margin-bottom:10px;"><div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>${s.icon} <b>${s.label}</b>${k===scores.primary?' <span style="font-size:10px;background:'+s.color+';color:#fff;padding:1px 7px;border-radius:8px;">Principal</span>':''}</span><span style="font-weight:bold;color:${s.color};">${p}%</span></div><div style="background:#e8ddd4;border-radius:6px;height:7px;overflow:hidden;"><div style="width:${p}%;height:100%;background:${s.color};border-radius:6px;"></div></div></div>`;
         }).join("");
@@ -309,7 +677,8 @@
         const adviceRows=primary.conseils.map(c=>`<div style="margin-bottom:8px;padding:10px 14px;border-radius:8px;background:#FFF8F2;border:1px dashed rgba(201,122,80,0.4);font-size:12px;color:#6b5246;font-style:italic;line-height:1.7;">${c}</div>`).join("");
         const html=`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"/></head><body style="font-family:Georgia,serif;background:#F2EBE0;padding:32px 24px;color:#2a1f1a;max-width:640px;margin:0 auto;">
 <h2 style="font-size:22px;margin:0 0 4px;">Style d'attachement${prenom?" — "+prenom:""}</h2>
-<p style="font-size:13px;color:#6b5246;font-style:italic;margin:0 0 28px;">Résultats de l'évaluation — 40 questions, 5 thèmes</p>
+<p style="font-size:13px;color:#6b5246;font-style:italic;margin:0 0 28px;">Résultats de l'évaluation — 56 questions, 6 thèmes</p>
+${childhoodRow}
 <div style="background:#fff;border-radius:12px;padding:20px;margin-bottom:16px;border:2px solid ${primary.color}30;">
   <div style="font-size:20px;font-weight:bold;color:${primary.color};margin-bottom:8px;">${primary.icon} Style principal : ${primary.label}</div>
   <p style="font-size:13px;color:#2a1f1a;line-height:1.85;font-style:italic;padding-left:12px;border-left:3px solid ${primary.color};margin:12px 0 14px;">${primary.desc}</p>
@@ -366,8 +735,10 @@ ${scores.primary==="S"?`
           <div style={{fontSize:13,color:MID,fontStyle:"italic"}}>Ton style d'attachement principal</div>
         </div>
 
+        <ChildhoodVsCurrentCard childhoodScores={childhoodScores} currentScores={scores}/>
+
         <div style={{background:"#fff",borderRadius:12,padding:20,marginBottom:14,border:"1px solid #e8ddd4"}}>
-          <div style={{fontSize:13,fontWeight:"bold",color:DARK,marginBottom:16}}>📊 Répartition des 4 styles</div>
+          <div style={{fontSize:13,fontWeight:"bold",color:DARK,marginBottom:16}}>📊 Répartition des 4 styles (vie actuelle)</div>
           {Object.entries(scores.pct).sort((a,b)=>b[1]-a[1]).map(([k,p])=>(
             <ScoreBar key={k} label={STYLES[k].label} pct={p} color={STYLES[k].color} icon={STYLES[k].icon} isPrimary={k===scores.primary}/>
           ))}
@@ -453,6 +824,8 @@ ${scores.primary==="S"?`
           </div>
         )}
 
+        <DeepInsightsCard insights={insights} scores={scores}/>
+
         <div style={{background:"#fff",borderRadius:12,padding:20,marginBottom:14,border:"1px solid #e8ddd4"}}>
           <div style={{fontSize:13,fontWeight:"bold",color:DARK,marginBottom:14}}>💬 Pistes de travail & points d'attention</div>
           {primary.conseils.map((c,i)=>(
@@ -497,14 +870,19 @@ ${scores.primary==="S"?`
     const [prenom,setPrenom]=useState("");
     const [email,setEmail]=useState("");
     const [answers,setAnswers]=useState({});
+    const [childhoodAnswers,setChildhoodAnswers]=useState({});
     const topRef=useRef(null);
-    const N=THEMES.length;
+    const N=THEMES.length; // 5 thèmes actuels
 
     useEffect(()=>{ if(topRef.current)topRef.current.scrollIntoView({behavior:"smooth"}); },[step]);
 
-    const currentTheme=step>=1&&step<=N?THEMES[step-1]:null;
-    const themeAnswered=currentTheme?currentTheme.questions.every(q=>answers[q.id]!==undefined):true;
-    const scores=step===N+1?computeScores(answers):null;
+    const isChildhoodStep=step===1;
+    const currentTheme=step>=2&&step<=N+1?THEMES[step-2]:null;
+    const themeAnswered=isChildhoodStep
+      ?CHILDHOOD_THEME.questions.every(q=>childhoodAnswers[q.id]!==undefined)
+      :currentTheme?currentTheme.questions.every(q=>answers[q.id]!==undefined):true;
+    const scores=step===N+2?computeScores(answers):null;
+    const childhoodScores=step===N+2?computeChildhoodScores(childhoodAnswers):null;
 
     return(
       <div ref={topRef} style={{minHeight:"100vh",background:BG,padding:"32px 16px",fontFamily:"Georgia,serif"}}>
@@ -514,9 +892,9 @@ ${scores.primary==="S"?`
             {step===0?(
               <>
                 <div style={{fontSize:24,fontWeight:"bold",color:DARK,marginBottom:4}}>Style d'attachement</div>
-                <div style={{fontSize:13,color:MID,fontStyle:"italic",lineHeight:1.6}}>40 questions · 5 thèmes · Sous-scores détaillés</div>
+                <div style={{fontSize:13,color:MID,fontStyle:"italic",lineHeight:1.6}}>56 questions · 6 thèmes · Enfance & vie actuelle</div>
               </>
-            ):step<=N?<ProgressBar step={step} total={N}/>:null}
+            ):step<=N+1?<ProgressBar step={step} total={N+1}/>:null}
           </div>
 
           {step===0&&(
@@ -525,6 +903,9 @@ ${scores.primary==="S"?`
                 <p style={{fontSize:13,color:DARK,lineHeight:1.9,marginBottom:16}}>
                   Le <b>style d'attachement</b> décrit la façon dont tu as appris à te relier aux autres — et à toi-même — dès l'enfance. Il influence profondément tes relations adultes, mais aussi ton rapport au travail, à l'argent et à ta propre valeur.
                 </p>
+                <div style={{padding:"10px 14px",borderRadius:8,background:"#f0fdf4",border:"1px solid #c8e6c9",marginBottom:16,fontSize:12,color:"#3a5a3a",lineHeight:1.7}}>
+                  🌱 <b>Nouveauté :</b> ce questionnaire explore d'abord ton <b>attachement d'enfance</b> (relation avec père et mère), puis ton style <b>aujourd'hui</b> — pour voir d'où tu pars et où tu en es.
+                </div>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:16}}>
                   {Object.values(STYLES).map(s=>(
                     <div key={s.label} style={{padding:"10px 12px",borderRadius:10,background:s.color+"12",border:`1px solid ${s.color}25`,display:"flex",alignItems:"center",gap:8}}>
@@ -567,6 +948,19 @@ ${scores.primary==="S"?`
             </div>
           )}
 
+          {isChildhoodStep&&(
+            <div className="fade-up" key="childhood">
+              <div style={{marginBottom:22,padding:"14px 16px",background:"#fff",borderRadius:10,border:"1px solid #c8e6c930",borderLeft:"4px solid #4CAF50"}}>
+                <div style={{fontSize:15,fontWeight:"bold",color:DARK,marginBottom:3}}>{CHILDHOOD_THEME.icon} {CHILDHOOD_THEME.title}</div>
+                <div style={{fontSize:12,color:MID,fontStyle:"italic"}}>{CHILDHOOD_THEME.subtitle}</div>
+              </div>
+              {CHILDHOOD_THEME.questions.map((q,i)=>(
+                <LikertQuestion key={q.id} question={q} value={childhoodAnswers[q.id]} onChange={val=>setChildhoodAnswers(a=>({...a,[q.id]:val}))} index={i}/>
+              ))}
+              {!themeAnswered&&<div style={{fontSize:12,color:"#F57C00",fontStyle:"italic",marginBottom:12}}>⚠️ Réponds à toutes les affirmations pour continuer.</div>}
+            </div>
+          )}
+
           {currentTheme&&(
             <div className="fade-up" key={step}>
               <div style={{marginBottom:22,padding:"14px 16px",background:"#fff",borderRadius:10,border:`1px solid ${ACCENT}30`,borderLeft:`4px solid ${ACCENT}`}}>
@@ -580,20 +974,20 @@ ${scores.primary==="S"?`
             </div>
           )}
 
-          {step===N+1&&scores&&<Results scores={scores} prenom={prenom} email={email}/>}
+          {step===N+2&&scores&&childhoodScores&&<Results scores={scores} childhoodScores={childhoodScores} answers={answers} prenom={prenom} email={email}/>}
 
-          {step<=N&&(
+          {step<=N+1&&(
             <div style={{display:"flex",justifyContent:"space-between",marginTop:24}}>
               {step>0?<button onClick={()=>setStep(s=>s-1)} style={{padding:"12px 24px",borderRadius:24,border:"1.5px solid #e0d4c8",background:"#fff",color:MID,fontSize:14}}>← Retour</button>:<div/>}
               <button onClick={()=>setStep(s=>s+1)} disabled={!themeAnswered&&step>0}
                 style={{padding:"12px 28px",borderRadius:24,border:"none",background:(!themeAnswered&&step>0)?"#e0d4c8":ACCENT,color:"#fff",fontSize:14,fontWeight:"bold",opacity:(!themeAnswered&&step>0)?0.6:1,transition:"all 0.2s"}}>
-                {step===0?"Commencer →":step===N?"Voir mes résultats →":"Continuer →"}
+                {step===0?"Commencer →":step===N+1?"Voir mes résultats →":"Continuer →"}
               </button>
             </div>
           )}
-          {step===N+1&&(
+          {step===N+2&&(
             <div style={{marginTop:24,textAlign:"center"}}>
-              <button onClick={()=>{setStep(0);setAnswers({});}} style={{padding:"12px 28px",borderRadius:24,border:`1.5px solid ${ACCENT}`,background:"transparent",color:ACCENT,fontSize:14}}>
+              <button onClick={()=>{setStep(0);setAnswers({});setChildhoodAnswers({});}} style={{padding:"12px 28px",borderRadius:24,border:`1.5px solid ${ACCENT}`,background:"transparent",color:ACCENT,fontSize:14}}>
                 ↺ Recommencer
               </button>
               <div style={{marginTop:24}}>
